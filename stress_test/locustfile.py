@@ -27,7 +27,7 @@ def login(username: str, password: str) -> Optional[str]:
         "Content-Type": "application/x-www-form-urlencoded",
     }
     data = {
-        "grant_type": "",
+        "grant_type": "password",
         "username": username,
         "password": password,
         "scope": "",
@@ -37,26 +37,34 @@ def login(username: str, password: str) -> Optional[str]:
     response = requests.post(url, headers=headers, data=data)
     if response.status_code == 200:
         return response.json()["access_token"]
-    else:
-        return None
+    return None
 
 
 class APIUser(HttpUser):
     wait_time = between(1, 5)
 
-    # Put your stress tests here.
-    # See https://docs.locust.io/en/stable/writing-a-locustfile.html for help.
-    # TODO
-    # raise NotImplementedError
     @task(1)
+    def index(self):
+        """Test the root endpoint"""
+        self.client.get("/", name="GET /")
+
+    @task(2)
     def predict(self):
         token = login("admin@example.com", "admin")
-        files = [("file", ("dog.jpeg", open("dog.jpeg", "rb"), "image/jpeg"))]
-        headers = {"Authorization": f"Bearer {token}"}
-        payload = {}
-        self.client.post(
-            "http://0.0.0.0:8000/model/predict",
-            headers=headers,
-            data=payload,
-            files=files,
-        )
+        if not token:
+            print("Login failed during stress test.")
+            return
+
+        try:
+            with open("dog.jpeg", "rb") as image_file:
+                files = [("file", ("dog.jpeg", image_file, "image/jpeg"))]
+                headers = {"Authorization": f"Bearer {token}"}
+
+                self.client.post(
+                    "/model/predict",
+                    headers=headers,
+                    files=files,
+                    name="POST /model/predict"
+                )
+        except FileNotFoundError:
+            print("dog.jpeg not found. Please make sure the file exists in this directory.")
