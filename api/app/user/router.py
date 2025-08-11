@@ -10,7 +10,7 @@ from . import schema, services, validator
 router = APIRouter(tags=["Users"], prefix="/user")
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("/", status_code=status.HTTP_201_CREATED, response_model=schema.DisplayUser)
 async def create_user_registration(
     request: schema.User, database: Session = Depends(db.get_db)
 ):
@@ -21,12 +21,22 @@ async def create_user_registration(
     #  3. If the email doesn't exist, create a new user, see `new_user_register()` function under `services.py`
     #  4. Return the new user object created
 
-    new_user = None
+    # Step 1: Verify email does not exist
+    if await validator.verify_email_exist(request.email, database):
+        # Step 2: If exists, raise HTTP 400
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email is already registered."
+        )
 
+    # Step 3: Create new user
+    new_user = await services.new_user_register(request, database)
+
+    # Step 4: Return created user
     return new_user
 
 
-@router.get("/")
+@router.get("/", response_model=List[schema.DisplayUser])
 async def get_all_users(
     database: Session = Depends(db.get_db),
     current_user: schema.User = Depends(get_current_user),

@@ -5,20 +5,24 @@ import time
 import numpy as np
 import redis
 import settings
-from tensorflow.keras.applications import ResNet50
-from tensorflow.keras.applications.resnet50 import decode_predictions, preprocess_input
-from tensorflow.keras.preprocessing import image
+from keras.applications.resnet50 import ResNet50
+from keras.applications.resnet50 import decode_predictions, preprocess_input
+from keras.utils import load_img, img_to_array
 
 # TODO
-# Connect to Redis and assign to variable `db``
+# Connect to Redis and assign to variable `db`
 # Make use of settings.py module to get Redis settings like host, port, etc.
-db = None
+db = redis.Redis(
+    host=settings.REDIS_IP,
+    port=settings.REDIS_PORT,
+    db=settings.REDIS_DB_ID
+)
 
 # TODO
 # Load your ML model and assign to variable `model`
 # See https://drive.google.com/file/d/1ADuBSE4z2ZVIdn66YDSwxKv-58U7WEOn/view?usp=sharing
 # for more information about how to use this model.
-model = None
+model = ResNet50(weights='imagenet')
 
 
 def predict(image_name):
@@ -42,13 +46,20 @@ def predict(image_name):
     # TODO: Implement the code to predict the class of the image_name
 
     # Load image
+    image_path = os.path.join(settings.UPLOAD_FOLDER, image_name)
+    image = load_img(image_path, target_size=(224, 224))
 
     # Apply preprocessing (convert to numpy array, match model input dimensions (including batch) and use the resnet50 preprocessing)
+    image = img_to_array(image)
+    image = np.expand_dims(image, axis=0)
+    image = preprocess_input(image)
 
     # Get predictions using model methods and decode predictions using resnet50 decode_predictions
-    _, class_name, pred_probability = None
+    decoded = decode_predictions(model.predict(image), top=1)[0][0]
+    _, class_name, pred_probability = decoded
 
     # Convert probabilities to float and round it
+    pred_probability = float(round(pred_probability, 4))
 
     return class_name, pred_probability
 
@@ -80,18 +91,27 @@ def classify_process():
         #       code with Redis making use of functions `brpop()` and `set()`.
         # TODO
         # Take a new job from Redis
+        job_data = db.brpop(settings.REDIS_QUEUE)
 
         # Decode the JSON data for the given job
+        job = json.loads(job_data[1])
 
         # Important! Get and keep the original job ID
+        image_name = job["image_name"]
+        job_id = job["id"]
 
         # Run the loaded ml model (use the predict() function)
+        class_name, pred_probability = predict(image_name)
 
         # Prepare a new JSON with the results
-        output = {"prediction": None, "score": None}
+        output = {
+            "prediction": class_name,
+            "score": pred_probability
+        }
 
         # Store the job results on Redis using the original
         # job ID as the key
+        db.set(job_id, json.dumps(output))
 
         # Sleep for a bit
         time.sleep(settings.SERVER_SLEEP)

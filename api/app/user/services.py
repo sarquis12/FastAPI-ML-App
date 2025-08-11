@@ -1,3 +1,4 @@
+from typing import List
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -28,7 +29,7 @@ async def new_user_register(request: schema.User, database: Session) -> models.U
     return new_user
 
 
-async def all_users(database: Session) -> models.User:
+async def all_users(database: Session) -> List[models.User]:
     """
     Retrieves all users from the database.
 
