@@ -52,6 +52,51 @@ def predict(token: str, uploaded_file: Image) -> requests.Response:
     return response
 
 
+# Configure page and layout
+st.set_page_config(page_title="Dogs Classifier App", page_icon="🐶")
+
+# Title of the application
+st.title("🎯 Dogs Classifier App")
+
+# Login section in sidebar
+st.sidebar.header("🔐 Login")
+username = st.sidebar.text_input("User")
+password = st.sidebar.text_input("Password", type="password")
+
+if "token" not in st.session_state:
+    st.session_state.token = None
+
+if st.sidebar.button("Start Session"):
+    token = login(username, password)
+    if token:
+        st.session_state.token = token
+        st.sidebar.success("Authentication approved ✅")
+    else:
+        st.sidebar.error("Authentication failed ❌")
+
+# Image upload and prediction
+st.header("📤 Upload File")
+uploaded_file = st.file_uploader("Choose an image (png/jpg/jpeg)", type=["png", "jpg", "jpeg"])
+
+if uploaded_file:
+    img = Image.open(uploaded_file)
+    st.image(img, caption="Uploaded Image", use_container_width=True)
+
+    if st.session_state.token:
+        response = predict(st.session_state.token, uploaded_file)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success"):
+                st.success(f"Prediction: {data.get('prediction')} | Score: {data.get('score')}")
+            else:
+                st.warning("Prediction failed.")
+        else:
+            st.error(f"Service error: {response.status_code}")
+    else:
+        st.info("Please start session to classify the image.")
+
+
+
 def send_feedback(
     token: str, feedback: str, score: float, prediction: str, image_file_name: str
 ) -> requests.Response:
