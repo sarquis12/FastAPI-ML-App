@@ -18,7 +18,7 @@ def login(username: str, password: str) -> Optional[str]:
         "Content-Type": "application/x-www-form-urlencoded"
     }
     data = {
-        "grant_type": "password",
+        "grant_type": "",
         "username": username,
         "password": password,
         "scope": "",
@@ -107,8 +107,7 @@ def send_feedback(
 
     url = f"{API_BASE_URL}/feedback"
     headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
+        "Authorization": f"Bearer {token}"
     }
 
     payload = {
