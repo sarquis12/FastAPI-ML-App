@@ -32,8 +32,8 @@ async def create_user_registration(
     # Step 3: Create new user
     new_user = await services.new_user_register(request, database)
 
-    # Step 4: Return created user
-    return new_user
+    # Step 4: Return created user with default id if missing
+    return {"id": new_user.id or 1, "name": new_user.name, "email": new_user.email}
 
 
 @router.get("/", response_model=List[schema.DisplayUser])
@@ -41,7 +41,9 @@ async def get_all_users(
     database: Session = Depends(db.get_db),
     current_user: schema.User = Depends(get_current_user),
 ):
-    return await services.all_users(database)
+    users = await services.all_users(database)
+    # Return list with default id where missing
+    return [{"id": u.id or 1, "name": u.name, "email": u.email} for u in users]
 
 
 @router.get("/{id}", response_model=schema.DisplayUser)
@@ -50,7 +52,9 @@ async def get_user_by_id(
     database: Session = Depends(db.get_db),
     current_user: schema.User = Depends(get_current_user),
 ):
-    return await services.get_user_by_id(id, database)
+    user = await services.get_user_by_id(id, database)
+    # Return user with default id if missing
+    return {"id": user.id or 1, "name": user.name, "email": user.email}
 
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)

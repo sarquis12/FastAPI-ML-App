@@ -17,7 +17,8 @@ async def create_feedback(
     database: Session = Depends(db.get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return await services.new_feedback(request, current_user, database)
+# Convert Pydantic model to dict for downstream service
+    return await services.new_feedback(request.dict(), current_user, database)
 
 
 @router.get("/", response_model=List[schema.DisplayFeedback])
