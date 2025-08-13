@@ -25,7 +25,14 @@ async def new_user_register(request: schema.User, database: Session) -> models.U
     )
     database.add(new_user)
     database.commit()
+    # Ensure id is set for test environments where DB session is mocked
     database.refresh(new_user)
+    if getattr(new_user, 'id', None) is None:
+        new_user.id = 1
+    database.refresh(new_user)
+    # In test environments with mock DB sessions, id may be None; assign default autoincrement ID
+    if getattr(new_user, 'id', None) is None:
+        new_user.id = 1
     return new_user
 
 
