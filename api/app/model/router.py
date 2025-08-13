@@ -26,10 +26,16 @@ async def predict(file: UploadFile, current_user=Depends(get_current_user)):
     # should return `rpse` dict with default values HTTP 400 Bad Request code
 
     # TODO
-    if not file or not utils.allowed_file(file.filename):
+    if not file:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or missing image file."
+        )
+    
+    if not utils.allowed_file(file.filename):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File type is not supported."
         )
 
     # Get hash-based filename
