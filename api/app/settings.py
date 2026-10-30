@@ -8,7 +8,7 @@ import dotenv
 dotenv.load_dotenv()
 
 # Run API in Debug mode
-API_DEBUG = True
+API_DEBUG = os.getenv("API_DEBUG", "False").lower() in ("true", "1", "yes")
 
 # We will store images uploaded by the user on this folder
 UPLOAD_FOLDER = "uploads/"

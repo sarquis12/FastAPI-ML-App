@@ -19,8 +19,6 @@ initial_connection_url = (
     f"postgresql://{DATABASE_USERNAME}:{DATABASE_PASSWORD}@{DATABASE_HOST}/postgres"
 )
 
-print(initial_connection_url)
-
 conn = None
 
 # Connect to PostgreSQL to create the database if it doesn't exist
@@ -45,7 +43,6 @@ finally:
 
 # Database connection URL to the newly created database
 SQLALCHEMY_DATABASE_URL = f"postgresql://{DATABASE_USERNAME}:{DATABASE_PASSWORD}@{DATABASE_HOST}/{DATABASE_NAME}"
-print(SQLALCHEMY_DATABASE_URL)
 
 # Create engine
 engine = create_engine(SQLALCHEMY_DATABASE_URL)

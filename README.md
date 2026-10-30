@@ -1,198 +1,184 @@
-# Sprint project 03
-> FastAPI ML App
+# 🖼️ Distributed Image Classification Microservices — FastAPI, Redis & TensorFlow
 
-## The Business problem
+![Python](https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![TensorFlow](https://img.shields.io/badge/TensorFlow-ResNet50-FF6F00?style=for-the-badge&logo=tensorflow&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-Message_Broker-DC382D?style=for-the-badge&logo=redis&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker_Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![Locust](https://img.shields.io/badge/Locust-Load_Testing-00A86B?style=for-the-badge)
 
-Imagine that you work for a company that has a large collection of images and needs to automatically classify them into different categories. This task can be time-consuming and error-prone when done manually by human workers.
+A decoupled, containerized **Machine Learning inference platform** that classifies uploaded images into over **1,000 ImageNet categories** using a pre-trained **Convolutional Neural Network (ResNet50)**. Built with a microservices architecture orchestrated via **Docker Compose**, it separates the web frontend, REST API gateway, asynchronous message queue, relational persistence, and deep learning worker process.
 
-Your task is to develop a solution that can automatically classify images into over 1000 different categories using a Convolutional Neural Network (CNN) implemented in Tensorflow. Your solution will consist of a Web UI and a Python FastAPI that serves the CNN.
+---
 
-The Web UI should allow users to upload an image and receive the predicted class for that image.
+## 🏗️ System Architecture
 
-The Python FastAPI should receive the uploaded image, preprocess it (e.g. resize, normalize), feed it into the CNN, and return the predicted class as a JSON object. The API should handle errors gracefully and provide informative error messages to the UI if something goes wrong.
+![System Architecture Diagram](System_architecture_diagram.png)
 
-You shouldn't worry for now about the TensorFlow CNN because we will use a pre-trained model for this problem. We provide you with a Jupyter notebook [here](https://drive.google.com/file/d/1ADuBSE4z2ZVIdn66YDSwxKv-58U7WEOn/view?usp=sharing) which shows how to load and run this model and hope will serve as a motivation for you to learn in-depth how these amazing models work during the next sprint!
+### How It Works
 
-## Technical aspects
+1. **Web UI (`ui/` — Streamlit)**: Provides an interactive interface for user authentication, image upload, real-time classification results, and user feedback submission on model predictions.
+2. **REST API (`api/` — FastAPI + SQLAlchemy)**:
+   - Manages user registration, password hashing (`bcrypt`), and **OAuth2 / JWT (`HS256`)** bearer authentication.
+   - Validates uploaded image formats, computes content-addressable **MD5 hashes** to deduplicate files on disk (`uploads/`), and enqueues inference jobs into **Redis**.
+   - Polls Redis asynchronously (`API_SLEEP = 0.05s`) using a unique correlation `job_id` until the prediction result is ready.
+   - Persists user accounts and model prediction feedback into **PostgreSQL**.
+3. **Message Broker (`redis:6.2.6`)**: Decouples HTTP request handling from CPU/GPU-bound deep learning inference via a blocking FIFO queue (`service_queue` using `rpush` / `brpop`).
+4. **ML Worker Service (`model/` — TensorFlow / Keras)**:
+   - Continuously listens on the Redis queue (`brpop`), preprocesses each image (`224x224` target size, batch expansion, ImageNet normalization), runs **ResNet50** inference, and writes the predicted class and confidence score back to Redis keyed by `job_id`.
+5. **Load & Stress Testing (`stress_test/` — Locust)**: Simulates concurrent users authenticating and submitting classification requests to benchmark throughput and latency under load.
 
-To develop this solution you will need to have a proper working environment setup in your machine consisting of:
-- Docker
-- docker-compose
-- VS Code or any other IDE of your preference
-- Optional: Linux subsystem for Windows (WSL2)
+---
 
-Please make sure to carefully read the `ASSIGNMENT.md` file which contains detailed instructions about the code you have to complete to make the project run correctly.
+## ✨ Key Features
 
-The technologies involved are:
-- Python is the main programming language
-- FastAPI framework for the API
-- Streamlit for the web UI
-- Redis for the communication between microservices
-- Tensorflow for loading the pre-trained CNN model
-- Locust for doing the stress testing of your solution
+- **🔐 JWT Security & User Management**: Full CRUD for users with `bcrypt` password hashing and OAuth2 Password Bearer JWT tokens (`30 min` expiration).
+- **⚡ Asynchronous Queue-Based Inference**: Non-blocking FastAPI endpoints (`async/await`) communicating with a dedicated TensorFlow worker over Redis.
+- **♻️ Content-Addressable Image Deduplication**: Uploaded images are renamed using their MD5 digest (`get_file_hash`), preventing redundant disk writes.
+- **📊 Feedback Loop Storage**: Captures user feedback (`score`, `prediction`, `feedback` text, `image_file_name`) in PostgreSQL for future model retraining and auditing.
+- **🐳 Multi-Stage Docker Builds**: Dedicated `test` and `build` targets across `api`, `model`, and `ui` Dockerfiles for isolated unit testing and lean runtime containers.
 
-## Installation
+---
 
-To run the services using compose:
+## 🖥️ Screenshots
 
-```bash
-$ cp .env.original .env
+### Interactive OpenAPI / Swagger Documentation (`/docs`)
+![FastAPI Docs](fastapi_docs.png)
+
+### Streamlit Web Application — Authentication & Classification
+| Login Screen | Image Classification & Feedback |
+| :---: | :---: |
+| ![UI Login](ui_login.png) | ![UI Classify](ui_classify.png) |
+
+---
+
+## 📁 Project Structure
+
+```text
+FastAPI-ML-App/
+├── api/                              # FastAPI Backend Microservice
+│   ├── app/
+│   │   ├── auth/                     # OAuth2 / JWT token generation & verification
+│   │   ├── feedback/                 # Feedback SQLAlchemy models, schemas & router
+│   │   ├── model/                    # /model/predict endpoint & Redis queue producer
+│   │   ├── user/                     # User CRUD, bcrypt hashing & validation
+│   │   ├── db.py                     # SQLAlchemy engine & session management
+│   │   ├── settings.py               # Environment-driven configuration
+│   │   └── utils.py                  # File extension validation & MD5 hashing
+│   ├── tests/                        # Pytest unit tests for routers & utilities
+│   ├── Dockerfile                    # Multi-stage Dockerfile (test / build)
+│   ├── main.py                       # FastAPI application entrypoint
+│   └── populate_db.py                # Database initialization & seed script
+├── model/                            # TensorFlow / Keras ML Worker Microservice
+│   ├── tests/                        # Unit tests for ResNet50 inference worker
+│   ├── Dockerfile                    # Multi-stage Dockerfile (x86_64)
+│   ├── Dockerfile.M1                 # Apple Silicon (ARM64) Dockerfile
+│   └── ml_service.py                 # Redis consumer & ResNet50 prediction loop
+├── ui/                               # Streamlit Frontend Microservice
+│   ├── app/image_classifier_app.py   # Web interface for login, upload & feedback
+│   ├── tests/                        # UI unit tests with mocked HTTP requests
+│   └── Dockerfile                    # Multi-stage Dockerfile
+├── stress_test/                      # Performance & Load Testing
+│   └── locustfile.py                 # Locust load test scenarios
+├── tests/                            # End-to-End Integration Tests
+│   └── test_integration.py           # Full pipeline integration test suite
+└── docker-compose.yml                # Multi-container orchestration
 ```
 
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- **Docker** & **Docker Compose**
+
+### 1. Clone the repository
+
 ```bash
-$ docker network create shared_network
+git clone https://github.com/sarquis12/FastAPI-ML-App.git
+cd FastAPI-ML-App
 ```
 
-Only for mac M1 users:
-- There is dockerfile for M1 macs model/Dockerfile.M1. This docker file downloads tensoflow compiled for M1
-- Change docker-compose.yaml to use that docker file.
-- Remove tensorflow for requirements.txt
-- Remember change back docker-compose.yaml and requirements.txt in the submission.
+### 2. Configure environment variables
 
-**Warning:** You won't be able to start the proyect until you complete the Dockerfile found at `api` folder, as stated in the [ASSIGNMENT.md](./ASSIGNMENT.md) file.
+Copy the environment template and set your PostgreSQL password and JWT secret key:
 
 ```bash
-$ docker-compose up --build -d
-```
-
-To stop the services:
-
-```bash
-$ docker-compose down
-```
-
-Populate the database:
-```bash
-cd api
 cp .env.original .env
+cp api/.env.original api/.env
+```
+
+Edit `.env` and `api/.env`:
+
+```dotenv
+POSTGRES_DB=sp3
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=your_secure_db_password
+DATABASE_HOST=db
+SECRET_KEY=your_secure_jwt_secret_key
+```
+
+### 3. Create the shared Docker network & launch services
+
+```bash
+docker network create shared_network
 docker-compose up --build -d
 ```
 
-
-## Access fastapi docs
-
-URL = http://localhost:8000/docs
-
-
-![Sample Image](fastapi_docs.png)
-
-To try the endpoints you need Authorize with user = admin@example.com password = admin
-
-
-## Access the UI
-
-URL = http://localhost:9090
-
-![Sample Image](ui_login.png)
-
-![Sample Image](ui_classify.png)
-
-- Login with:
-    - user: `admin@example.com`
-    - pass: `admin`
-- You can upload an image
-- You can classify it
-- You can send an feedback about the model output
-
-
-## Code Style
-
-Following a style guide keeps the code's aesthetics clean and improves readability, making contributions and code reviews easier. Automated Python code formatters make sure your codebase stays in a consistent style without any manual work on your end. If adhering to a specific style of coding is important to you, employing an automated to do that job is the obvious thing to do. This avoids bike-shedding on nitpicks during code reviews, saving you an enormous amount of time overall.
-
-We use [Black](https://black.readthedocs.io/) and [isort](https://pycqa.github.io/isort/) for automated code formatting in this project, you can run it with:
-
-```console
-$ isort --profile=black . && black --line-length 88 .
-```
-
-Wanna read more about Python code style and good practices? Please see:
-- [The Hitchhiker’s Guide to Python: Code Style](https://docs.python-guide.org/writing/style/)
-- [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html)
-
-## Tests
-
-We provide unit tests along with the project that you can run and check from your side the code meets the minimum requirements of correctness needed to approve. To run just execute:
-
-### 1. Modules
-
-We make use of [multi-stage docker builds](https://docs.docker.com/develop/develop-images/multistage-build/) so we can have into the same Dockerfile environments for testing and also for deploying our service.
-
-#### 1.1. Api
-
-Run:
+### 4. Initialize and seed the database
 
 ```bash
-$ cd api/
-$ docker build -t fastapi_test --progress=plain --target test .
+cd api
+docker-compose up --build -d
 ```
 
-You will only need to pay attention to the logs corresponding to the testing code which will look like this:
+### 5. Access the services
+
+- **Streamlit Web UI**: `http://localhost:9090`
+- **FastAPI Swagger UI**: `http://localhost:8000/docs`
+- **Default Demo Account** (created by `populate_db.py`):
+  - **Email**: `admin@example.com`
+  - **Password**: `admin`
+
+To stop all running containers:
 
 ```bash
-#10 [test 1/1] RUN ["pytest", "-v", "/src/tests"]
-#10 sha256:707efc0d59d04744766193fe6873d212afc0f8e4b28d035a2d2e94b40826604f
-#10 0.537 ============================= test session starts ==============================
-#10 0.537 platform linux -- Python 3.8.13, pytest-7.1.1, pluggy-1.0.0 -- /usr/local/bin/python
-#10 0.537 cachedir: .pytest_cache
-#10 0.537 rootdir: /src
-#10 0.537 collecting ... collected 4 items
-#10 0.748
-#10 0.748 tests/test_api.py::TestIntegration::test_bad_parameters PASSED           [ 25%]
-#10 0.757 tests/test_api.py::TestEnpointsAvailability::test_feedback PASSED        [ 50%]
-#10 0.769 tests/test_api.py::TestEnpointsAvailability::test_index PASSED           [ 75%]
-#10 0.772 tests/test_api.py::TestEnpointsAvailability::test_predict PASSED         [100%]
-#10 0.776
-#10 0.776 ============================== 4 passed in 0.24s ===============================
-#10 DONE 0.8s
+docker-compose down
 ```
 
-You are good if all tests are passing.
+---
 
-#### 1.2. Model
+## 🧪 Running Tests
 
-Same as api, run:
+Each microservice uses **multi-stage Docker builds** with a dedicated `test` target that runs `pytest`:
 
 ```bash
-$ cd model/
-$ docker build -t model_test --progress=plain --target test .
+# 1. API Unit Tests
+cd api && docker build -t fastapi_test --progress=plain --target test .
+
+# 2. ML Model Worker Unit Tests
+cd ../model && docker build -t model_test --progress=plain --target test .
+
+# 3. Streamlit UI Unit Tests
+cd ../ui && docker build -t ui_test --progress=plain --target test .
 ```
 
-#### 1.3 UI
-```bash
-$ cd ui/
-$ docker build -t ui_test --progress=plain --target test .
-```
+### End-to-End Integration Tests
 
-
-### 2. Integration end-to-end
-
-You must have the full pipeline running (see previous section) and the following Python libraries installed:
-
-- [requests==2.28.1](https://requests.readthedocs.io/en/latest/)
-- [pytest==7.1.2](https://docs.pytest.org/en/7.1.x/)
-
-You can install them using the file `tests/requirements.txt` with:
+With the Docker Compose stack running:
 
 ```bash
-$ pip3 install -r tests/requirements.txt
+pip install -r tests/requirements.txt
+python tests/test_integration.py
 ```
 
-Then, from the project root folder run:
+---
 
-```
-$ python tests/test_integration.py
-```
+## 👤 Author
 
-If the output looks like this, then the integration tests are passing:
-
-```bash
-.
-----------------------------------------------------------------------
-Ran 2 tests in 0.299s
-
-OK
-```
-
-If you want to learn more about testing Python code, please read:
-- [Effective Python Testing With Pytest](https://realpython.com/pytest-python-testing/)
-- [The Hitchhiker’s Guide to Python: Testing Your Code](https://docs.python-guide.org/writing/tests/)
+**Elias Yusef Sarquis Boutros**
+- [LinkedIn](https://www.linkedin.com/in/elias-yusef-sarquis-boutros)
+- [GitHub](https://github.com/sarquis12)
